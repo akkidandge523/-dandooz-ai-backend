@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>DanDooz AI</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      padding-top: 50px;
+    }
+    .box {
+      width: 600px;
+      background: #020617;
+      padding: 20px;
+      border-radius: 10px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      border: none;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .answer {
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+    a {
+      color: #60a5fa;
+    }
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h2>🤖 DanDooz AI</h2>
+  <input id="q" placeholder="Ask anything..." />
+  <button onclick="ask()">Ask</button>
+  <div id="out" class="answer"></div>
+</div>
+
+<script>
+async function ask() {
+  const q = document.getElementById("q").value;
+  const out = document.getElementById("out");
+  out.innerHTML = "Thinking...";
+
+  const res = await fetch(
+    `http://127.0.0.1:8000/ask?question=${encodeURIComponent(q)}`
+  );
+  const data = await res.json();
+
+  let html = `<b>Answer:</b><br>${data.answer}`;
+
+  if (data.sources) {
+    html += "<hr><b>Sources:</b><ul>";
+    data.sources.forEach(s => {
+      html += `<li><a href="${s.link}" target="_blank">${s.title}</a></li>`;
+    });
+    html += "</ul>";
+  }
+  out.innerHTML = html;
+}
+</script>
+
+</body>
+</html>
