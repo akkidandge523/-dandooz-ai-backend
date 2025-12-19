@@ -21,12 +21,13 @@ def root():
 @app.get("/ask")
 def ask(question: str):
     try:
-        # 1️⃣ Get search results
-        results = web_search(question)
+        # 1️⃣ Get search results SAFELY
+        results = web_search(question) or []
 
         context = "\n".join(
             f"- {r.get('title', '')}: {r.get('snippet', '')}"
             for r in results
+            if isinstance(r, dict)
         )
 
         prompt = f"""
@@ -95,7 +96,7 @@ Question:
             "sources": results
         }
 
-    except Exception as e:
+    except Exception:
         # 5️⃣ Absolute safety net — NEVER crash
         return {
             "answer": "Internal processing error. Please try again.",
