@@ -1,28 +1,31 @@
 import os
 import requests
 
-SERPAPI_KEY = os.getenv("SERPAPI_KEY")
-
-def web_search(query):
-    if not SERPAPI_KEY:
+def web_search(query: str):
+    api_key = os.getenv("SERPAPI_KEY")
+    if not api_key:
         return []
 
     params = {
-        "q": query,
         "engine": "google",
-        "api_key": SERPAPI_KEY,
+        "q": query,
+        "api_key": api_key,
         "num": 5
     }
 
-    res = requests.get("https://serpapi.com/search", params=params)
-    data = res.json()
+    try:
+        res = requests.get("https://serpapi.com/search", params=params, timeout=10)
+        data = res.json()
+    except Exception:
+        return []
 
     results = []
+
     for r in data.get("organic_results", []):
         results.append({
-            "title": r.get("title"),
-            "link": r.get("link"),
-            "snippet": r.get("snippet")
+            "title": r.get("title", "No title"),
+            "snippet": r.get("snippet", "No description available"),
+            "link": r.get("link", "")
         })
 
     return results
