@@ -5,13 +5,6 @@ import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# ✅ SAFE import (prevents Render crash)
-try:
-    from search import web_search
-except Exception as e:
-    print("⚠️ search.py failed to load:", e)
-    web_search = None
-
 app = FastAPI()
 
 app.add_middleware(
@@ -28,43 +21,20 @@ def root():
 
 @app.get("/ask")
 def ask(question: str):
-    # 🔎 SAFE SEARCH
-    results = []
-    if web_search:
-        try:
-            results = web_search(question)
-            if not isinstance(results, list):
-                results = []
-        except Exception as e:
-            print("SEARCH FAILED:", e)
-            results = []
+    api_key = os.getenv("OPENAI_API_KEY")
 
-    # 🧠 BUILD CONTEXT
-    context = "\n".join(
-        f"- {r.get('title','')}: {r.get('snippet','')}"
-        for r in results if isinstance(r, dict)
-    )
+    if not api_key:
+        return {
+            "answer": "AI service is not configured yet.",
+            "sources": []
+        }
 
     prompt = f"""
-You are DanDooz AI.
-
 Answer clearly and in detail.
-If search data is weak or empty, answer using general knowledge.
-
-Search data:
-{context}
 
 Question:
 {question}
 """
-
-    # 🔑 OPENAI SAFETY
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return {
-            "answer": "AI service is not configured yet.",
-            "sources": results
-        }
 
     try:
         response = requests.post(
@@ -82,10 +52,9 @@ Question:
         )
 
         if response.status_code != 200:
-            print("OpenAI HTTP error:", response.text)
             return {
                 "answer": "AI service temporarily unavailable.",
-                "sources": results
+                "sources": []
             }
 
         data = response.json()
@@ -93,10 +62,12 @@ Question:
 
         return {
             "answer": answer.strip(),
-            "sources": results
+            "sources": []
         }
 
     except Exception as e:
         print("OPENAI FAILED:", e)
         return {
             "answer": "AI service temporarily unavailable.",
+            "sources": []
+        }
