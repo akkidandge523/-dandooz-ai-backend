@@ -1,8 +1,16 @@
+print("🔥 RUNNING DANDOOZ BACKEND v2 — SAFE MODE ENABLED 🔥")
+
 import os
 import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from search import web_search
+
+# ✅ SAFE import (prevents Render crash)
+try:
+    from search import web_search
+except Exception as e:
+    print("⚠️ search.py failed to load:", e)
+    web_search = None
 
 app = FastAPI()
 
@@ -20,85 +28,75 @@ def root():
 
 @app.get("/ask")
 def ask(question: str):
-    try:
-        # 1️⃣ Get search results SAFELY
-        results = web_search(question) or []
+    # 🔎 SAFE SEARCH
+    results = []
+    if web_search:
+        try:
+            results = web_search(question)
+            if not isinstance(results, list):
+                results = []
+        except Exception as e:
+            print("SEARCH FAILED:", e)
+            results = []
 
-        context = "\n".join(
-            f"- {r.get('title', '')}: {r.get('snippet', '')}"
-            for r in results
-            if isinstance(r, dict)
-        )
+    # 🧠 BUILD CONTEXT
+    context = "\n".join(
+        f"- {r.get('title','')}: {r.get('snippet','')}"
+        for r in results if isinstance(r, dict)
+    )
 
-        prompt = f"""
-You are DanDooz AI, a professional research assistant.
+    prompt = f"""
+You are DanDooz AI.
 
-Answer clearly and in detail using the search data.
-Do not guess.
+Answer clearly and in detail.
+If search data is weak or empty, answer using general knowledge.
 
-Search Data:
+Search data:
 {context}
 
 Question:
 {question}
 """
 
-        api_key = os.getenv("OPENAI_API_KEY")
-
-        # 2️⃣ If API key missing → don't crash
-        if not api_key:
-            return {
-                "answer": "AI service is not configured.",
-                "sources": results
-            }
-
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+    # 🔑 OPENAI SAFETY
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        return {
+            "answer": "AI service is not configured yet.",
+            "sources": results
         }
 
-        payload = {
-            "model": "gpt-4o-mini",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0
-        }
-
-        # 3️⃣ Call OpenAI safely
+    try:
         response = requests.post(
             "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=25
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2
+            },
+            timeout=30
         )
 
-        # 4️⃣ If OpenAI fails → safe fallback
         if response.status_code != 200:
+            print("OpenAI HTTP error:", response.text)
             return {
-                "answer": "AI service is temporarily unavailable.",
+                "answer": "AI service temporarily unavailable.",
                 "sources": results
             }
 
         data = response.json()
-
-        answer = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
-
-        if not answer:
-            answer = "No answer could be generated."
+        answer = data["choices"][0]["message"]["content"]
 
         return {
             "answer": answer.strip(),
             "sources": results
         }
 
-    except Exception:
-        # 5️⃣ Absolute safety net — NEVER crash
+    except Exception as e:
+        print("OPENAI FAILED:", e)
         return {
-            "answer": "Internal processing error. Please try again.",
-            "sources": []
-        }
+            "answer": "AI service temporarily unavailable.",
